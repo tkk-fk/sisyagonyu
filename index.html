@@ -281,10 +281,7 @@
     background: #fff;
     color: var(--text);
     transition: border-color 0.2s;
-    -moz-appearance: textfield;
   }
-  .input-row input::-webkit-outer-spin-button,
-  .input-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .input-row input:focus { border-color: var(--accent); }
 
   /* instruction */
@@ -544,7 +541,7 @@
   <div class="card">
     <div class="input-row">
       <label for="num-input">数字 →</label>
-      <input type="number" id="num-input" value="9876" min="10" max="9999999" inputmode="numeric" pattern="[0-9]*" oninput="handleInput()">
+      <input type="text" id="num-input" value="3456" inputmode="numeric" pattern="[0-9]*" oninput="handleInput()" placeholder="数字を入れてね">
     </div>
 
     <div class="instruction" id="instruction">「まで」の位の数字をタップ！</div>
@@ -710,8 +707,23 @@ function resetSeesaw() {
   document.querySelectorAll('.digit-btn').forEach(d => { d.classList.remove('active'); d.classList.remove('target'); });
 }
 
+function normalizeDigits(str) {
+  // Convert full-width digits ０-９ to half-width 0-9, strip non-digits
+  return str.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30))
+            .replace(/[^0-9]/g, '');
+}
+
 function handleInput() {
-  const val = document.getElementById('num-input').value;
+  const inputEl = document.getElementById('num-input');
+  const raw = inputEl.value;
+  const normalized = normalizeDigits(raw).slice(0, 7); // max 7 digits
+
+  // Update input if normalization changed anything (full-width → half-width)
+  if (normalized !== raw) {
+    inputEl.value = normalized;
+  }
+
+  const val = normalized;
   const digitsEl = document.getElementById('digits');
   const instEl = document.getElementById('instruction');
   const hintEl = document.getElementById('idle-hint');
