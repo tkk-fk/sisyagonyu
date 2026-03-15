@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>四捨五入シーソー</title>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky-top: #b8e4f0;
+    --sky-bottom: #daf0e3;
+    --ground: #7aad55;
+    --ground-dark: #5e9440;
+    --wood: #c08840;
+    --wood-dark: #9a6a2a;
+    --wood-light: #daa855;
+    --stone: #6b7d8a;
+    --stone-dark: #4a5962;
+    --accent: #e8913a;
+    --accent-dark: #c87520;
+    --text: #3d3225;
+    --text-light: #8a7a66;
+    --card: #fffcf7;
+    --up-color: #e04040;
+    --down-color: #3080d0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { touch-action: manipulation; }
+
+  body {
+    font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
+    background: linear-gradient(170deg, #fdf8ef 0%, #f3e8d4 100%);
+    min-height: 100vh;
+    padding: 16px;
+    color: var(--text);
+  }
+
+  .app {
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 1.35em;
+    font-weight: 900;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .header h1 span { font-size: 1.3em; }
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+  }
+  .mute-btn {
+    position: absolute;
+    right: 0;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 2px solid #e0d5c3;
+    background: var(--card);
+    cursor: pointer;
+    font-size: 1.15em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    color: var(--text-light);
+  }
+  .mute-btn:active { transform: scale(0.9); }
+  .mute-btn.muted { opacity: 0.5; }
+
+  /* ─── Seesaw Scene ─── */
+  .scene {
+    position: relative;
+    width: 100%;
+    height: 240px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 60%, var(--ground) 85%, var(--ground-dark) 100%);
+    box-shadow: 0 8px 30px rgba(90,70,40,0.12);
+  }
+
+  /* clouds */
+  .cloud {
+    position: absolute;
+    background: rgba(255,255,255,0.55);
+    border-radius: 30px;
+    filter: blur(2px);
+  }
+  .cloud-1 { width: 60px; height: 14px; top: 18px; left: 15%; }
+  .cloud-2 { width: 45px; height: 11px; top: 34px; left: 62%; }
+  .cloud-3 { width: 70px; height: 13px; top: 12px; left: 78%; }
+
+  /* fulcrum */
+  .fulcrum {
+    position: absolute;
+    bottom: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
+  .fulcrum-triangle {
+    width: 0; height: 0;
+    border-left: 22px solid transparent;
+    border-right: 22px solid transparent;
+    border-bottom: 38px solid var(--stone);
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15));
+  }
+  .fulcrum-base {
+    width: 52px; height: 5px;
+    background: var(--stone-dark);
+    border-radius: 2px;
+    margin-top: -1px;
+  }
+
+  /* beam wrapper - this rotates */
+  .beam-wrapper {
+    position: absolute;
+    bottom: 76px;
+    left: 5%;
+    width: 90%;
+    height: 14px;
+    transform-origin: center center;
+    transition: transform 0.8s cubic-bezier(0.34, 1.2, 0.64, 1);
+    z-index: 12;
+  }
+
+  /* beam plank */
+  .beam {
+    width: 100%;
+    height: 14px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-dark) 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    position: relative;
+  }
+  .beam::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 8%; right: 8%;
+    height: 2px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 1px;
+  }
+
+  /* labels on beam */
+  .beam-label {
+    position: absolute;
+    font-size: 0.82em;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 7px;
+    white-space: nowrap;
+    transition: opacity 0.3s;
+  }
+  .beam-label-left {
+    top: 18px; left: 0;
+    color: var(--down-color);
+    background: rgba(255,255,255,0.75);
+  }
+  .beam-label-mid {
+    top: -24px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--text-light);
+    font-size: 0.72em;
+    background: rgba(255,255,255,0.8);
+    border: 1.5px dashed #c4a97d;
+  }
+  .beam-label-right {
+    top: 18px; right: 0;
+    color: var(--up-color);
+    background: rgba(255,255,255,0.75);
+  }
+
+  /* sliding block (the number ball) */
+  .block {
+    position: absolute;
+    bottom: 16px;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #ff7043, #e64a19);
+    color: #fff;
+    font-size: 1.15em;
+    font-weight: 900;
+    padding: 7px 16px;
+    border-radius: 40px;
+    box-shadow: 0 4px 14px rgba(230,74,25,0.35);
+    white-space: nowrap;
+    opacity: 0;
+    transition: none;
+    z-index: 15;
+  }
+
+  /* tilt classes */
+  .beam-wrapper.tilt-left { transform: rotate(-10deg); }
+  .beam-wrapper.tilt-right { transform: rotate(10deg); }
+
+  /* result badge */
+  .result-badge {
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%) scale(0);
+    background: rgba(255,255,255,0.95);
+    border-radius: 14px;
+    padding: 6px 20px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    text-align: center;
+    z-index: 30;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .result-badge.show {
+    transform: translateX(-50%) scale(1);
+  }
+  .result-badge .label { font-size: 0.7em; color: #999; font-weight: 600; }
+  .result-badge .value { font-size: 1.6em; font-weight: 900; color: #2d6a4f; }
+
+  /* grass blades */
+  .grass {
+    position: absolute;
+    bottom: 32px;
+    width: 6px; height: 10px;
+    background: #6ea34a;
+    border-radius: 50% 50% 0 0;
+  }
+
+  /* idle text */
+  .idle-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.95em;
+    font-weight: 700;
+    color: rgba(90,70,40,0.4);
+    white-space: nowrap;
+    transition: opacity 0.3s;
+  }
+
+  /* ─── Controls Card ─── */
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 20px 18px;
+    margin-top: 12px;
+    box-shadow: 0 4px 18px rgba(90,70,40,0.07);
+  }
+
+  /* input row */
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .input-row label {
+    font-size: 0.85em;
+    font-weight: 800;
+    color: var(--text-light);
+    white-space: nowrap;
+  }
+  .input-row input {
+    flex: 1;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.6em;
+    font-weight: 900;
+    text-align: center;
+    padding: 8px 12px;
+    border: 2.5px solid #ddd0be;
+    border-radius: 12px;
+    outline: none;
+    background: #fff;
+    color: var(--text);
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .input-row input::-webkit-outer-spin-button,
+  .input-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .input-row input:focus { border-color: var(--accent); }
+
+  /* instruction */
+  .instruction {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: var(--accent-dark);
+    text-align: center;
+    min-height: 1.4em;
+    margin-bottom: 10px;
+    transition: opacity 0.2s;
+  }
+
+  /* digit display */
+  .digits {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .digit-col { text-align: center; }
+  .digit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px; height: 58px;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.6em;
+    font-weight: 900;
+    border-radius: 12px;
+    border: 2.5px solid #d4c4a8;
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  .digit-btn:hover:not(.disabled) {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(232,145,58,0.2);
+  }
+  .digit-btn:active:not(.disabled) {
+    transform: translateY(-1px) scale(0.97);
+  }
+  .digit-btn.active {
+    background: linear-gradient(135deg, #ffe0b2, #ffcc80);
+    border-color: var(--accent);
+    color: var(--accent-dark);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 6px 18px rgba(232,145,58,0.28);
+  }
+  .digit-btn.target {
+    background: linear-gradient(135deg, #ffcdd2, #ef9a9a);
+    border-color: #e53935;
+    color: #c62828;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 6px 18px rgba(229,57,53,0.28);
+    animation: targetPulse 1.2s ease-in-out infinite;
+  }
+  .digit-btn.disabled {
+    cursor: default;
+    color: #ccc;
+    border-color: #e8e0d4;
+    background: #f5f0e8;
+  }
+  .place-label {
+    font-size: 0.65em;
+    font-weight: 700;
+    color: var(--text-light);
+    margin-top: 3px;
+  }
+  .digit-btn.active + .place-label,
+  .digit-btn.active ~ .place-label { color: var(--accent-dark); }
+  .digit-btn.target + .place-label { color: #e53935; }
+
+  /* explanation card */
+  .explanation {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #faf5ed;
+    border: 1.5px solid #ede3d2;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.4s, transform 0.4s;
+    font-size: 0.9em;
+    line-height: 1.7;
+    text-align: center;
+  }
+  .explanation.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .explanation .target-digit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: 900;
+    font-size: 1.1em;
+    margin: 0 3px;
+    vertical-align: middle;
+  }
+  .explanation .target-digit.up { background: linear-gradient(135deg, #ef4444, #dc2626); }
+  .explanation .target-digit.down { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .explanation .answer {
+    font-size: 1.3em;
+    font-weight: 900;
+    color: #2d6a4f;
+  }
+
+  /* animations */
+  @keyframes gentleBob {
+    0%,100% { transform: translate(-50%, -50%) translateY(0); }
+    50% { transform: translate(-50%, -50%) translateY(-4px); }
+  }
+  @keyframes targetPulse {
+    0%,100% { box-shadow: 0 6px 18px rgba(229,57,53,0.28); }
+    50% { box-shadow: 0 6px 24px rgba(229,57,53,0.5); }
+  }
+
+  /* ─── Responsive: small phones (≤380px) ─── */
+  @media (max-width: 380px) {
+    body { padding: 8px; }
+    .header h1 { font-size: 1.15em; }
+    .scene { height: 200px; border-radius: 16px; }
+    .fulcrum { bottom: 36px; }
+    .fulcrum-triangle {
+      border-left-width: 18px;
+      border-right-width: 18px;
+      border-bottom-width: 32px;
+    }
+    .fulcrum-base { width: 42px; }
+    .beam-wrapper { bottom: 62px; }
+    .beam { height: 12px; }
+    .beam-label { font-size: 0.68em; padding: 1px 5px; }
+    .beam-label-mid { font-size: 0.6em; top: -20px; }
+    .beam-label-left { top: 16px; }
+    .beam-label-right { top: 16px; }
+    .block { font-size: 0.95em; padding: 5px 10px; }
+    .result-badge { padding: 5px 14px; }
+    .result-badge .value { font-size: 1.3em; }
+    .grass { bottom: 26px; width: 5px; height: 8px; }
+    .card { padding: 14px 12px; border-radius: 14px; }
+    .input-row input { font-size: 1.3em; padding: 6px 8px; }
+    .digit-btn { width: 40px; height: 50px; font-size: 1.35em; border-radius: 10px; }
+    .instruction { font-size: 0.8em; }
+    .explanation { font-size: 0.82em; padding: 10px 12px; }
+  }
+
+  /* ─── Responsive: standard phones (381px–480px) ─── */
+  @media (min-width: 381px) and (max-width: 480px) {
+    body { padding: 10px; }
+    .scene { height: 220px; }
+    .digit-btn { width: 44px; height: 54px; font-size: 1.45em; }
+    .block { font-size: 1.05em; padding: 6px 12px; }
+  }
+
+  /* ─── Responsive: tablets (481px–768px) ─── */
+  @media (min-width: 481px) and (max-width: 768px) {
+    .app { max-width: 560px; }
+    .scene { height: 260px; }
+    .digit-btn { width: 52px; height: 62px; font-size: 1.7em; }
+  }
+
+  /* ─── Responsive: large tablets / landscape (769px+) ─── */
+  @media (min-width: 769px) {
+    .app { max-width: 600px; }
+    .scene { height: 280px; border-radius: 24px; }
+    .header h1 { font-size: 1.5em; }
+    .digit-btn { width: 56px; height: 66px; font-size: 1.8em; }
+    .card { padding: 24px 22px; }
+  }
+
+  /* ─── Touch devices: better tap targets ─── */
+  @media (hover: none) and (pointer: coarse) {
+    .digit-btn {
+      min-width: 44px;
+      min-height: 48px;
+    }
+    .digit-btn:hover:not(.disabled) {
+      transform: none;
+      box-shadow: none;
+      border-color: #d4c4a8;
+    }
+    .digit-btn:active:not(.disabled) {
+      transform: scale(0.93);
+      border-color: var(--accent);
+      background: #fff5e6;
+    }
+    .input-row input {
+      font-size: 1.5em;
+      padding: 10px 12px;
+    }
+  }
+
+  /* ─── Safe area for notched phones ─── */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    body {
+      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="header-row">
+      <h1><span>⚖️</span> 四捨五入シーソー</h1>
+      <button class="mute-btn" id="mute-btn" onclick="toggleMute()" title="音のオン／オフ">🔊</button>
+    </div>
+  </div>
+
+  <!-- Seesaw Scene -->
+  <div class="scene" id="scene">
+    <div class="cloud cloud-1"></div>
+    <div class="cloud cloud-2"></div>
+    <div class="cloud cloud-3"></div>
+
+    <div class="idle-hint" id="idle-hint" style="animation: gentleBob 2.5s ease-in-out infinite;">数字を入れてね ↓</div>
+
+    <div class="beam-wrapper" id="beam-wrapper">
+      <div class="beam">
+        <div class="beam-label beam-label-left" id="lbl-left" style="opacity:0"></div>
+        <div class="beam-label beam-label-mid" id="lbl-mid" style="opacity:0"></div>
+        <div class="beam-label beam-label-right" id="lbl-right" style="opacity:0"></div>
+      </div>
+      <div class="block" id="block"></div>
+    </div>
+
+    <div class="fulcrum">
+      <div class="fulcrum-triangle"></div>
+      <div class="fulcrum-base"></div>
+    </div>
+
+    <div class="result-badge" id="result-badge">
+      <div class="label">答え</div>
+      <div class="value" id="result-value"></div>
+    </div>
+
+    <!-- grass -->
+    <div class="grass" style="left:4%; transform:rotate(-10deg)"></div>
+    <div class="grass" style="left:12%; transform:rotate(8deg)"></div>
+    <div class="grass" style="left:24%; transform:rotate(-6deg)"></div>
+    <div class="grass" style="left:40%; transform:rotate(10deg)"></div>
+    <div class="grass" style="left:56%; transform:rotate(-8deg)"></div>
+    <div class="grass" style="left:68%; transform:rotate(12deg)"></div>
+    <div class="grass" style="left:80%; transform:rotate(-5deg)"></div>
+    <div class="grass" style="left:92%; transform:rotate(7deg)"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card">
+    <div class="input-row">
+      <label for="num-input">数字 →</label>
+      <input type="number" id="num-input" value="9876" min="10" max="9999999" inputmode="numeric" pattern="[0-9]*" oninput="handleInput()">
+    </div>
+
+    <div class="instruction" id="instruction">「まで」の位の数字をタップ！</div>
+
+    <div class="digits" id="digits"></div>
+
+    <div class="explanation" id="explanation"></div>
+  </div>
+</div>
+
+<script>
+const PLACE_NAMES = {1:'一',2:'十',3:'百',4:'千',5:'万',6:'十万',7:'百万'};
+let t1, t2, t3, t4;
+
+/* ─── Sound Effects (Web Audio API) ─── */
+let audioCtx = null;
+let muted = false;
+
+function toggleMute() {
+  muted = !muted;
+  const btn = document.getElementById('mute-btn');
+  btn.textContent = muted ? '🔇' : '🔊';
+  btn.classList.toggle('muted', muted);
+}
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTap() {
+  if (muted) return;
+  // short pop / click
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(800, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.18, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.1);
+}
+
+function playDrop() {
+  if (muted) return;
+  // thud - low impact
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(220, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.2);
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.25);
+  // noise burst for impact texture
+  const bufSize = ctx.sampleRate * 0.06;
+  const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+  const noise = ctx.createBufferSource();
+  const nGain = ctx.createGain();
+  noise.buffer = buf;
+  noise.connect(nGain);
+  nGain.connect(ctx.destination);
+  nGain.gain.setValueAtTime(0.12, ctx.currentTime);
+  nGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+  noise.start(ctx.currentTime);
+}
+
+function playTilt() {
+  if (muted) return;
+  // creaky wood - descending tone sweep
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(300, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.4);
+  gain.gain.setValueAtTime(0.06, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 0.1);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.4);
+}
+
+function playSlide() {
+  if (muted) return;
+  // swoosh - filtered noise
+  const ctx = getAudioCtx();
+  const bufSize = ctx.sampleRate * 0.5;
+  const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  noise.buffer = buf;
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(800, ctx.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(2500, ctx.currentTime + 0.3);
+  filter.Q.value = 1.5;
+  gain.gain.setValueAtTime(0.001, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.13, ctx.currentTime + 0.08);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+  noise.start(ctx.currentTime);
+  noise.stop(ctx.currentTime + 0.5);
+}
+
+function playResult() {
+  if (muted) return;
+  // cheerful two-note chime
+  const ctx = getAudioCtx();
+  const notes = [523, 784]; // C5 → G5
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    const t = ctx.currentTime + i * 0.13;
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  });
+}
+
+function fmt(n) { return n.toLocaleString(); }
+
+function resetSeesaw() {
+  clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+
+  const wrapper = document.getElementById('beam-wrapper');
+  const block = document.getElementById('block');
+  const badge = document.getElementById('result-badge');
+
+  wrapper.className = 'beam-wrapper';
+  block.style.transition = 'none';
+  block.style.opacity = '0';
+  block.style.bottom = '120px';
+  badge.classList.remove('show');
+
+  document.getElementById('lbl-left').style.opacity = '0';
+  document.getElementById('lbl-mid').style.opacity = '0';
+  document.getElementById('lbl-right').style.opacity = '0';
+
+  document.querySelectorAll('.digit-btn').forEach(d => { d.classList.remove('active'); d.classList.remove('target'); });
+}
+
+function handleInput() {
+  const val = document.getElementById('num-input').value;
+  const digitsEl = document.getElementById('digits');
+  const instEl = document.getElementById('instruction');
+  const hintEl = document.getElementById('idle-hint');
+  const explEl = document.getElementById('explanation');
+
+  resetSeesaw();
+  explEl.classList.remove('show');
+
+  if (!val || val.length < 2 || parseInt(val) < 10) {
+    digitsEl.innerHTML = '';
+    instEl.textContent = '2ケタ以上の数字を入れてね';
+    hintEl.style.opacity = '1';
+    return;
+  }
+
+  hintEl.style.opacity = '0';
+  instEl.textContent = '「まで」の位の数字をタップ！';
+  digitsEl.innerHTML = '';
+
+  for (let i = 0; i < val.length; i++) {
+    const col = document.createElement('div');
+    col.className = 'digit-col';
+
+    const btn = document.createElement('button');
+    btn.className = 'digit-btn';
+    btn.textContent = val[i];
+    btn.id = 'dbtn-' + i;
+
+    const placeFromRight = val.length - i;
+    const lbl = document.createElement('div');
+    lbl.className = 'place-label';
+    lbl.textContent = PLACE_NAMES[placeFromRight] || '';
+
+    if (i === val.length - 1) {
+      btn.classList.add('disabled');
+    } else {
+      btn.onclick = () => handleDigitClick(i, val);
+    }
+
+    col.appendChild(btn);
+    col.appendChild(lbl);
+    digitsEl.appendChild(col);
+  }
+}
+
+function handleDigitClick(index, numStr) {
+  resetSeesaw();
+  document.getElementById('explanation').classList.remove('show');
+  playTap();
+
+  // highlight
+  document.getElementById('dbtn-' + index).classList.add('active');
+  // highlight target digit (the one being rounded) in red
+  const targetBtn = document.getElementById('dbtn-' + (index + 1));
+  if (targetBtn) targetBtn.classList.add('target');
+
+  const number = parseInt(numStr);
+  const placeFromRight = numStr.length - 1 - index;
+  const divisor = Math.pow(10, placeFromRight);
+  const lower = Math.floor(number / divisor) * divisor;
+  const upper = lower + divisor;
+  const mid = lower + divisor / 2;
+  const pct = ((number - lower) / divisor) * 100;
+  const targetDigit = Math.floor((number % divisor) / (divisor / 10));
+  const rounded = Math.round(number / divisor) * divisor;
+  const isUp = targetDigit >= 5;
+
+  const instEl = document.getElementById('instruction');
+  instEl.textContent = `${fmt(lower)} と ${fmt(upper)}、どちらに近い？`;
+
+  // show labels
+  document.getElementById('lbl-left').textContent = fmt(lower);
+  document.getElementById('lbl-mid').textContent = fmt(mid);
+  document.getElementById('lbl-right').textContent = fmt(upper);
+  document.getElementById('lbl-left').style.opacity = '1';
+  document.getElementById('lbl-mid').style.opacity = '1';
+  document.getElementById('lbl-right').style.opacity = '1';
+
+  // position block above
+  const block = document.getElementById('block');
+  block.textContent = fmt(number);
+  block.style.transition = 'none';
+  block.style.left = pct + '%';
+  block.style.bottom = '120px';
+  block.style.opacity = '1';
+
+  const wrapper = document.getElementById('beam-wrapper');
+
+  // step 1: drop onto beam
+  t1 = setTimeout(() => {
+    block.style.transition = 'bottom 0.45s cubic-bezier(0.55, 0, 1, 0.45)';
+    block.style.bottom = '16px';
+    setTimeout(playDrop, 350); // thud on landing
+
+    // step 2: tilt
+    t2 = setTimeout(() => {
+      wrapper.classList.add(isUp ? 'tilt-right' : 'tilt-left');
+      playTilt();
+
+      // step 3: slide
+      t3 = setTimeout(() => {
+        block.style.transition = 'left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        block.style.left = isUp ? '95%' : '5%';
+        playSlide();
+
+        // step 4: show result
+        t4 = setTimeout(() => {
+          document.getElementById('result-value').textContent = '≈ ' + fmt(rounded);
+          document.getElementById('result-badge').classList.add('show');
+          playResult();
+          showExplanation(number, lower, upper, mid, targetDigit, rounded, isUp, placeFromRight);
+        }, 700);
+      }, 400);
+    }, 500);
+  }, 60);
+}
+
+function showExplanation(number, lower, upper, mid, digit, rounded, isUp, placeFromRight) {
+  const el = document.getElementById('explanation');
+  const placeName = PLACE_NAMES[placeFromRight] || '';
+  const cls = isUp ? 'up' : 'down';
+  const direction = isUp ? '切り上げ' : '切り捨て';
+  const reason = isUp ? '5以上' : '4以下';
+  const dirColor = isUp ? 'var(--up-color)' : 'var(--down-color)';
+  const closer = number >= mid ? fmt(upper) : fmt(lower);
+
+  el.innerHTML = `
+    ${placeName}の位の下の桁
+    <span class="target-digit ${cls}">${digit}</span>
+    は<b>${reason}</b>なので<b style="color:${dirColor}">${direction}</b>
+    <br>
+    ${fmt(mid)} より <b>${closer} に近い</b> →
+    <span class="answer">${fmt(rounded)}</span>
+  `;
+  el.classList.add('show');
+}
+
+// init
+window.onload = handleInput;
+</script>
+</body>
+</html>
