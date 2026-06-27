@@ -358,6 +358,43 @@
   .digit-btn.active ~ .place-label { color: var(--accent-dark); }
   .digit-btn.target + .place-label { color: #e53935; }
 
+  /* ─── 四捨五入 button ─── */
+  .round-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 14px;
+    padding: 16px;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.2em;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #a85e12, 0 8px 18px rgba(200,117,32,0.28);
+    min-height: 60px;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .round-btn.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    animation: roundPulse 1.4s ease-in-out infinite;
+  }
+  .round-btn.show:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 #a85e12, 0 4px 10px rgba(200,117,32,0.28);
+    animation: none;
+  }
+
   /* explanation card */
   .explanation {
     margin-top: 14px;
@@ -405,6 +442,10 @@
     0%,100% { box-shadow: 0 6px 18px rgba(229,57,53,0.28); }
     50% { box-shadow: 0 6px 24px rgba(229,57,53,0.5); }
   }
+  @keyframes roundPulse {
+    0%,100% { box-shadow: 0 5px 0 #a85e12, 0 8px 18px rgba(200,117,32,0.28); }
+    50% { box-shadow: 0 5px 0 #a85e12, 0 8px 26px rgba(200,117,32,0.55); }
+  }
 
   /* ─── Responsive: small phones (≤380px) ─── */
   @media (max-width: 380px) {
@@ -432,6 +473,7 @@
     .input-row input { font-size: 1.3em; padding: 6px 8px; }
     .digit-btn { width: 40px; height: 50px; font-size: 1.35em; border-radius: 10px; }
     .instruction { font-size: 0.8em; }
+    .round-btn { font-size: 1.05em; padding: 13px; min-height: 52px; }
     .explanation { font-size: 0.82em; padding: 10px 12px; }
   }
 
@@ -548,13 +590,16 @@
 
     <div class="digits" id="digits"></div>
 
+    <button class="round-btn" id="round-btn" onclick="doRounding()">⚖️ 四捨五入</button>
+
     <div class="explanation" id="explanation"></div>
   </div>
 </div>
 
 <script>
 const PLACE_NAMES = {1:'一',2:'十',3:'百',4:'千',5:'万',6:'十万',7:'百万'};
-let t1, t2, t3, t4;
+let t1, t2, t3, t4, tBtn;
+let pendingRound = null;
 
 /* ─── Sound Effects (Web Audio API) ─── */
 let audioCtx = null;
@@ -575,7 +620,6 @@ function getAudioCtx() {
 
 function playTap() {
   if (muted) return;
-  // short pop / click
   const ctx = getAudioCtx();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -592,7 +636,6 @@ function playTap() {
 
 function playDrop() {
   if (muted) return;
-  // thud - low impact
   const ctx = getAudioCtx();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -605,7 +648,6 @@ function playDrop() {
   gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + 0.25);
-  // noise burst for impact texture
   const bufSize = ctx.sampleRate * 0.06;
   const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
   const data = buf.getChannelData(0);
@@ -622,7 +664,6 @@ function playDrop() {
 
 function playTilt() {
   if (muted) return;
-  // creaky wood - descending tone sweep
   const ctx = getAudioCtx();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -640,7 +681,6 @@ function playTilt() {
 
 function playSlide() {
   if (muted) return;
-  // swoosh - filtered noise
   const ctx = getAudioCtx();
   const bufSize = ctx.sampleRate * 0.5;
   const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
@@ -666,9 +706,8 @@ function playSlide() {
 
 function playResult() {
   if (muted) return;
-  // cheerful two-note chime
   const ctx = getAudioCtx();
-  const notes = [523, 784]; // C5 → G5
+  const notes = [523, 784];
   notes.forEach((freq, i) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -687,8 +726,13 @@ function playResult() {
 
 function fmt(n) { return n.toLocaleString(); }
 
+function hideRoundBtn() {
+  document.getElementById('round-btn').classList.remove('show');
+}
+
 function resetSeesaw() {
-  clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+  clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(tBtn);
+  pendingRound = null;
 
   const wrapper = document.getElementById('beam-wrapper');
   const block = document.getElementById('block');
@@ -699,6 +743,7 @@ function resetSeesaw() {
   block.style.opacity = '0';
   block.style.bottom = '120px';
   badge.classList.remove('show');
+  hideRoundBtn();
 
   document.getElementById('lbl-left').style.opacity = '0';
   document.getElementById('lbl-mid').style.opacity = '0';
@@ -708,7 +753,6 @@ function resetSeesaw() {
 }
 
 function normalizeDigits(str) {
-  // Convert full-width digits ０-９ to half-width 0-9, strip non-digits
   return str.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30))
             .replace(/[^0-9]/g, '');
 }
@@ -716,9 +760,8 @@ function normalizeDigits(str) {
 function handleInput() {
   const inputEl = document.getElementById('num-input');
   const raw = inputEl.value;
-  const normalized = normalizeDigits(raw).slice(0, 7); // max 7 digits
+  const normalized = normalizeDigits(raw).slice(0, 7);
 
-  // Update input if normalization changed anything (full-width → half-width)
   if (normalized !== raw) {
     inputEl.value = normalized;
   }
@@ -776,7 +819,6 @@ function handleDigitClick(index, numStr) {
 
   // highlight
   document.getElementById('dbtn-' + index).classList.add('active');
-  // highlight target digit (the one being rounded) in red
   const targetBtn = document.getElementById('dbtn-' + (index + 1));
   if (targetBtn) targetBtn.classList.add('target');
 
@@ -790,6 +832,9 @@ function handleDigitClick(index, numStr) {
   const targetDigit = Math.floor((number % divisor) / (divisor / 10));
   const rounded = Math.round(number / divisor) * divisor;
   const isUp = targetDigit >= 5;
+
+  // remember everything the 四捨五入 button needs
+  pendingRound = { number, lower, upper, mid, targetDigit, rounded, isUp, placeFromRight };
 
   const instEl = document.getElementById('instruction');
   instEl.textContent = `${fmt(lower)} と ${fmt(upper)}、どちらに近い？`;
@@ -810,35 +855,47 @@ function handleDigitClick(index, numStr) {
   block.style.bottom = '120px';
   block.style.opacity = '1';
 
-  const wrapper = document.getElementById('beam-wrapper');
-
-  // step 1: drop onto beam
+  // step 1: drop onto beam, then STOP and wait for the 四捨五入 button
   t1 = setTimeout(() => {
     block.style.transition = 'bottom 0.45s cubic-bezier(0.55, 0, 1, 0.45)';
     block.style.bottom = '16px';
     setTimeout(playDrop, 350); // thud on landing
 
-    // step 2: tilt
-    t2 = setTimeout(() => {
-      wrapper.classList.add(isUp ? 'tilt-right' : 'tilt-left');
-      playTilt();
-
-      // step 3: slide
-      t3 = setTimeout(() => {
-        block.style.transition = 'left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-        block.style.left = isUp ? '95%' : '5%';
-        playSlide();
-
-        // step 4: show result
-        t4 = setTimeout(() => {
-          document.getElementById('result-value').textContent = '≈ ' + fmt(rounded);
-          document.getElementById('result-badge').classList.add('show');
-          playResult();
-          showExplanation(number, lower, upper, mid, targetDigit, rounded, isUp, placeFromRight);
-        }, 700);
-      }, 400);
+    // reveal the 四捨五入 button after the block has landed
+    tBtn = setTimeout(() => {
+      document.getElementById('round-btn').classList.add('show');
     }, 500);
   }, 60);
+}
+
+function doRounding() {
+  if (!pendingRound) return;
+  const { number, lower, upper, mid, targetDigit, rounded, isUp, placeFromRight } = pendingRound;
+  pendingRound = null; // prevent double-trigger
+
+  hideRoundBtn();
+
+  const block = document.getElementById('block');
+  const wrapper = document.getElementById('beam-wrapper');
+
+  // step 2: tilt
+  wrapper.classList.add(isUp ? 'tilt-right' : 'tilt-left');
+  playTilt();
+
+  // step 3: slide
+  t3 = setTimeout(() => {
+    block.style.transition = 'left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    block.style.left = isUp ? '95%' : '5%';
+    playSlide();
+
+    // step 4: show result
+    t4 = setTimeout(() => {
+      document.getElementById('result-value').textContent = '≈ ' + fmt(rounded);
+      document.getElementById('result-badge').classList.add('show');
+      playResult();
+      showExplanation(number, lower, upper, mid, targetDigit, rounded, isUp, placeFromRight);
+    }, 700);
+  }, 400);
 }
 
 function showExplanation(number, lower, upper, mid, digit, rounded, isUp, placeFromRight) {
